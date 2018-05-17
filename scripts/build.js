@@ -47,11 +47,10 @@ measureFileSizesBeforeBuild(paths.appBuild)
     // Remove all content but keep the directory so that
     // if you're in it, you don't end up in Trash
     fs.emptyDirSync(paths.appBuild);
-    // Merge with the public folder
-    copyPublicFolder();
-    // Start the webpack build
-    return build(previousFileSizes);
+    // Create production directory structure
+    createProdDirectoryStructures(previousFileSizes);
   })
+  /*
   .then(
     ({ stats, previousFileSizes, warnings }) => {
       if (warnings.length) {
@@ -99,12 +98,13 @@ measureFileSizesBeforeBuild(paths.appBuild)
       process.exit(1);
     }
   );
+  */
 
 // Create the production build and print the deployment instructions.
-function build(previousFileSizes) {
+function build(previousFileSizes, outputDir) {
   console.log('Creating an optimized production build...');
 
-  let compiler = webpack(config);
+  let compiler = webpack(config(outputDir));
   return new Promise((resolve, reject) => {
     compiler.run((err, stats) => {
       if (err) {
@@ -142,9 +142,24 @@ function build(previousFileSizes) {
   });
 }
 
-function copyPublicFolder() {
-  fs.copySync(paths.appPublic, paths.appBuild, {
+function copyPublicFolder(dir) {
+  fs.copySync(paths.appPublic, dir, {
     dereference: true,
     filter: file => file !== paths.appHtml,
   });
+}
+
+async function createProdDirectoryStructure(previousFileSizes, outputDir) {
+    try {
+      await fs.mkdirs(outputDir)
+      copyPublicFolder(outputDir);
+      const result = await build(previousFileSizes, outputDir)
+      return result
+    } catch (error) {
+      console.error('Error creating the production directory:', outputDir, error)
+    }
+}
+
+function createProdDirectoryStructures(previousFileSizes) {
+  paths.appBuildStructure.forEach((outputDir) => createProdDirectoryStructure(previousFileSizes, outputDir))
 }

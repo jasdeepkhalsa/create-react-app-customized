@@ -38,10 +38,17 @@ function getServedPath(appPackageJson) {
   return ensureSlash(servedUrl, true);
 }
 
+function createProdDirectoryPaths(parent, folders, subfolders) {
+  const output = []
+  folders.forEach(folder => subfolders.forEach(subfolder => output.push(resolveApp(`${parent}/${folder}/${subfolder}`))))
+  return output
+}
+
 // config after eject: we're in ./config/
 module.exports = {
   dotenv: resolveApp('.env'),
   appBuild: resolveApp('build'),
+  appBuildStructure: createProdDirectoryPaths('build', ['cat1', 'cat2'], ['sub1', 'sub2']),
   appPublic: resolveApp('public'),
   appHtml: resolveApp('public/index.html'),
   appIndexJs: resolveApp('src/index.js'),
