@@ -38,9 +38,14 @@ function getServedPath(appPackageJson) {
   return ensureSlash(servedUrl, true);
 }
 
-function createProdDirectoryPaths(parent, folders, subfolders) {
+function createProdDirectoryPaths(parent, themes) {
   const output = []
-  folders.forEach(folder => subfolders.forEach(subfolder => output.push(resolveApp(`${parent}/${folder}/${subfolder}`))))
+  themes.forEach(theme => output.push(
+    {
+      ...theme,
+      path: resolveApp(`${parent}/${theme.theme}`)
+    }
+  ))
   return output
 }
 
@@ -48,7 +53,13 @@ function createProdDirectoryPaths(parent, folders, subfolders) {
 module.exports = {
   dotenv: resolveApp('.env'),
   appBuild: resolveApp('build'),
-  appBuildStructure: createProdDirectoryPaths('build', ['cat1', 'cat2'], ['sub1', 'sub2']),
+  appBuildStructure: createProdDirectoryPaths(
+    'build',
+    [
+      { theme: 'cat1' },
+      { theme: 'cat2' },
+    ]
+  ),
   appPublic: resolveApp('public'),
   appHtml: resolveApp('public/index.html'),
   appIndexJs: resolveApp('src/index.js'),

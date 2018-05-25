@@ -31,80 +31,53 @@ const measureFileSizesBeforeBuild =
 const printFileSizesAfterBuild = FileSizeReporter.printFileSizesAfterBuild;
 const useYarn = fs.existsSync(paths.yarnLockFile);
 
-// These sizes are pretty large. We'll warn for bundles exceeding them.
-const WARN_AFTER_BUNDLE_GZIP_SIZE = 512 * 1024;
-const WARN_AFTER_CHUNK_GZIP_SIZE = 1024 * 1024;
-
 // Warn and crash if required files are missing
 if (!checkRequiredFiles([paths.appHtml, paths.appIndexJs])) {
   process.exit(1);
 }
 
-// First, read the current file sizes in build directory.
-// This lets us display how much they changed later.
-measureFileSizesBeforeBuild(paths.appBuild)
-  .then(previousFileSizes => {
-    // Remove all content but keep the directory so that
-    // if you're in it, you don't end up in Trash
-    fs.emptyDirSync(paths.appBuild);
-    // Create production directory structure
-    createProdDirectoryStructures(previousFileSizes);
-  })
-  /*
-  .then(
-    ({ stats, previousFileSizes, warnings }) => {
-      if (warnings.length) {
-        console.log(chalk.yellow('Compiled with warnings.\n'));
-        console.log(warnings.join('\n\n'));
-        console.log(
-          '\nSearch for the ' +
-            chalk.underline(chalk.yellow('keywords')) +
-            ' to learn more about each warning.'
-        );
-        console.log(
-          'To ignore, add ' +
-            chalk.cyan('// eslint-disable-next-line') +
-            ' to the line before.\n'
-        );
-      } else {
-        console.log(chalk.green('Compiled successfully.\n'));
-      }
+// Lets empty the directory
+fs.emptyDirSync(paths.appBuild);
+// Create production directory structure
+createProdDirectoryStructures(paths.appBuildStructure);
 
-      console.log('File sizes after gzip:\n');
-      printFileSizesAfterBuild(
-        stats,
-        previousFileSizes,
-        paths.appBuild,
-        WARN_AFTER_BUNDLE_GZIP_SIZE,
-        WARN_AFTER_CHUNK_GZIP_SIZE
+function buildInfo({ stats, warnings, outputDir, theme }) {
+    if (warnings.length) {
+      console.log(chalk.yellow(`Compiled ${theme} with warnings.\n`));
+      console.log(warnings.join('\n\n'));
+      console.log(
+        '\nSearch for the ' +
+          chalk.underline(chalk.yellow('keywords')) +
+          ' to learn more about each warning.'
       );
-      console.log();
-
-      const appPackage = require(paths.appPackageJson);
-      const publicUrl = paths.publicUrl;
-      const publicPath = config.output.publicPath;
-      const buildFolder = path.relative(process.cwd(), paths.appBuild);
-      printHostingInstructions(
-        appPackage,
-        publicUrl,
-        publicPath,
-        buildFolder,
-        useYarn
+      console.log(
+        'To ignore, add ' +
+          chalk.cyan('// eslint-disable-next-line') +
+          ' to the line before.\n'
       );
-    },
-    err => {
-      console.log(chalk.red('Failed to compile.\n'));
-      printBuildError(err);
-      process.exit(1);
+    } else {
+      console.log(chalk.green(`Compiled ${theme} successfully.\n`));
     }
-  );
-  */
+
+    const appPackage = require(paths.appPackageJson);
+    const publicUrl = paths.publicUrl;
+    const publicPath = config().output.publicPath;
+    const buildFolder = outputDir;
+    printHostingInstructions(
+      appPackage,
+      publicUrl,
+      publicPath,
+      buildFolder,
+      useYarn
+    );
+    console.log('-------------------------------------------------------')
+  }
 
 // Create the production build and print the deployment instructions.
-function build(previousFileSizes, outputDir) {
-  console.log('Creating an optimized production build...');
+function build(outputDir, theme) {
+  console.log(`Creating an optimized production build for ${theme}`);
 
-  let compiler = webpack(config(outputDir));
+  let compiler = webpack(config(outputDir, theme));
   return new Promise((resolve, reject) => {
     compiler.run((err, stats) => {
       if (err) {
@@ -135,8 +108,9 @@ function build(previousFileSizes, outputDir) {
       }
       return resolve({
         stats,
-        previousFileSizes,
         warnings: messages.warnings,
+        outputDir,
+        theme,
       });
     });
   });
@@ -149,17 +123,19 @@ function copyPublicFolder(dir) {
   });
 }
 
-async function createProdDirectoryStructure(previousFileSizes, outputDir) {
+async function createProdDirectoryStructure({ path, theme }) {
     try {
-      await fs.mkdirs(outputDir)
-      copyPublicFolder(outputDir);
-      const result = await build(previousFileSizes, outputDir)
-      return result
+      await fs.mkdirs(path)
+      copyPublicFolder(path);
+      const result = await build(path, theme)
+      await buildInfo(result, theme)
     } catch (error) {
-      console.error('Error creating the production directory:', outputDir, error)
+      console.log(chalk.red(`Failed to compile ${theme}.\n`));
+      printBuildError(error);
+      process.exit(1);
     }
 }
 
-function createProdDirectoryStructures(previousFileSizes) {
-  paths.appBuildStructure.forEach((outputDir) => createProdDirectoryStructure(previousFileSizes, outputDir))
+function createProdDirectoryStructures(themes) {
+  themes.forEach((theme) => createProdDirectoryStructure(theme))
 }
